@@ -86,56 +86,44 @@ int main() {
         cities[i].id = i;
         std::cin >> cities[i].x;
         std::cin >> cities[i].y;
-    }
-    
-    std::vector<City> path(numCities);
-    std::vector<DistanceData> distanceData = TSP(cities, path, numCities); 
+    } 
 
     // Local search
-    int seed = 42;
+    int seed = 10;
     std::default_random_engine rndEngine(seed);
-    std::uniform_int_distribution<int> distPath(0, path.size() - 1);
+    std::uniform_int_distribution<int> distPath(0, cities.size() - 1);
 
-    std::vector<City> bestPath = path;
-    float shortestDistance = getPathDistance(bestPath);
+    std::vector<City> bestPath;
+    float bestDistance = INT_MAX;
 
-    int performedSearches = 0;
-    int totalLocalSearches = numCities * 10;
-    while (performedSearches < totalLocalSearches) {
-        // Avoid equal indices
-        int r1 = distPath(rndEngine), r2 = distPath(rndEngine);
-        if (r1 == r2) continue;
-
-        // Order indices
-        if (r1 > r2) {
-            int tmp = r1;
-            r1 = r2;
-            r2 = tmp;
+    int totalSearches = 10 * numCities;
+    for (int i = 0; i < totalSearches; i++) {
+        std::vector<City> shuffledPath = cities;
+        std::shuffle(shuffledPath.begin(), shuffledPath.end(), rndEngine); 
+        float shuffledDistance = getPathDistance(shuffledPath);
+        for (size_t j = 0; j < shuffledPath.size(); j++) {
+            for (size_t w = 0; w < shuffledPath.size(); w++) {
+                std::vector<City> changePath = shuffledPath;
+                std::iter_swap(changePath.begin() + j, changePath.begin() + w);
+                float changeDistance = getPathDistance(changePath);
+                if (changeDistance < shuffledDistance) {
+                    shuffledDistance = changeDistance;
+                    shuffledPath = changePath;
+                }
+            }
+        }
+        if (shuffledDistance < bestDistance) {
+            bestDistance = shuffledDistance;
+            bestPath = shuffledPath;
         }
 
-        // Swap items
-        std::vector<City> testPath = bestPath;
-        std::iter_swap(testPath.begin() + r1, testPath.begin() + r2);
-
-        // New path distance
-        float pathDistance = getPathDistance(testPath);
-
-        // Get new best distance if possible
-        if (pathDistance < shortestDistance) {
-            bestPath = testPath;
-            shortestDistance = pathDistance;
-        }
-
-        // cerr print
-        std::cerr << "local: " << shortestDistance << " ";
-        for (City city : bestPath)
+        std::cerr << "local: " << bestDistance << " ";
+        for (const auto city : bestPath)
             std::cerr << city.id << " ";
-        std::cerr << '\n';
-
-        performedSearches++;
+        std::cerr << std::endl;
     }
 
-    std::cout << shortestDistance << " 0" << "\n";
+    std::cout << bestDistance << " 0" << "\n";
     for (City city : bestPath)
         std::cout << city.id << " ";
     std::cout << std::endl;
