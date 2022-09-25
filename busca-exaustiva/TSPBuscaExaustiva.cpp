@@ -42,31 +42,36 @@ float getPathDistance(std::vector<City> path) {
     return pathDistance;
 }
 
-std::vector<std::vector<int>> TSPExaustivo(std::vector<int> path, std::vector<int> possibleCities, int numCities) {
+std::vector<City> TSPExaustivo(std::vector<City> path, std::vector<City> possibleCities, int* numLeafs) {
     // Leaf node
-    std::vector<std::vector<int>> possiblePaths;
-    if (path.size() == (size_t)numCities) {
-        possiblePaths.push_back(path);
-        return possiblePaths;
+    if (possibleCities.size() == 0) {
+        *numLeafs += 1;
+        return path;
     }
-
-    possiblePaths.resize(factorial(possibleCities.size()));
 
     // Exaustive search
-    int i = 0, j = 0, k = factorial(possibleCities.size() - 1), f = k;
-    for (const auto &city : possibleCities) {
-        std::vector<int> addedPath = path;
-        std::vector<int> newPossibleCities = possibleCities;
-        newPossibleCities.erase(newPossibleCities.begin() + i);
-        addedPath.push_back(city);
-        std::vector<std::vector<int>> newPaths = TSPExaustivo(addedPath, newPossibleCities, numCities);
-        
-        for (j; j < k; j++)
-            possiblePaths[j] = newPaths[j % f];
-        k += f;
-        i++;
+    std::vector<std::vector<City>> childrenBestPaths(possibleCities.size());
+    for (size_t i = 0; i < possibleCities.size(); i++) {
+        std::vector<City> childPath = path;
+        childPath.push_back(possibleCities[i]);
+
+        std::vector<City> childPossibleCities = possibleCities;
+        childPossibleCities.erase(childPossibleCities.begin() + i);
+        childrenBestPaths[i] = TSPExaustivo(childPath, childPossibleCities, numLeafs);
     }
-    return possiblePaths;
+
+    // Find child best path
+    std::vector<City> bestPath;
+    float bestDistance = INT_MAX;
+    for (const auto &path : childrenBestPaths) {
+        float childDistance = getPathDistance(path);
+        if (childDistance < bestDistance) {
+            bestDistance = childDistance;
+            bestPath = path;
+        }
+    }
+
+    return bestPath;
 }
 
 int main() {
@@ -81,30 +86,39 @@ int main() {
     } 
 
     // Busca exaustiva
-    std::vector<int> possibleCities(numCities);
-    for (int i = 0; i < numCities; i++)
-        possibleCities[i] = i;
-    std::vector<int> defaultPath;
-    std::vector<std::vector<int>> possiblePaths = TSPExaustivo(defaultPath, possibleCities, cities.size());
+    int numLeafs = 0;
+    std::vector<City> defaultPath;
+    std::vector<City> bestPath = TSPExaustivo(defaultPath, cities, &numLeafs);
 
-    std::vector<City> bestPath;
-    float bestDistance = INT_MAX;
-    for (const auto &path : possiblePaths) {
-        std::vector<City> possiblePath;
-        for (const auto &cityId : path)
-            possiblePath.push_back(cities[cityId]);
-        float possibleDistance = getPathDistance(possiblePath);
-        if (possibleDistance < bestDistance) {
-            bestDistance = possibleDistance;
-            bestPath = possiblePath;
-        }
-    }
-
-    std::cerr << "num_leafs " << possiblePaths.size() << std::endl;
-    std::cout << bestDistance << " 1" << std::endl;
-    for (const auto& city : bestPath)
+    std::cerr << "num_leafs " << numLeafs << std::endl;
+    std::cout << getPathDistance(bestPath) << " 1" << std::endl;
+    for (const auto &city : bestPath)
         std::cout << city.id << " ";
     std::cout << std::endl;
+    //std::vector<int> possibleCities(numCities);
+    //for (int i = 0; i < numCities; i++)
+    //    possibleCities[i] = i;
+    //std::vector<int> defaultPath;
+    //std::vector<std::vector<int>> possiblePaths = TSPExaustivo(defaultPath, possibleCities, cities.size());
+
+    //std::vector<City> bestPath;
+    //float bestDistance = INT_MAX;
+    //for (const auto &path : possiblePaths) {
+    //    std::vector<City> possiblePath;
+    //    for (const auto &cityId : path)
+    //        possiblePath.push_back(cities[cityId]);
+    //    float possibleDistance = getPathDistance(possiblePath);
+    //    if (possibleDistance < bestDistance) {
+    //        bestDistance = possibleDistance;
+    //        bestPath = possiblePath;
+    //    }
+    //}
+
+    //std::cerr << "num_leafs " << possiblePaths.size() << std::endl;
+    //std::cout << bestDistance << " 1" << std::endl;
+    //for (const auto& city : bestPath)
+    //    std::cout << city.id << " ";
+    //std::cout << std::endl;
 
     return 1;
 }
