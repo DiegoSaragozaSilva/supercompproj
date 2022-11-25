@@ -46,10 +46,19 @@ float TSP(City* cities, int* path, int numCities) {
     while (pathSize < numCities) {
         int i = 0, j = 0;
         DistanceData* distances = (DistanceData*)malloc(sizeof(DistanceData) * (numCities - pathSize));
-        for (i = 0; i < numCities; i++) {
-            if (std::find(path, (int*)(path + pathSize), i) == (int*)(path + pathSize))
-                distances[j++] = distance(cities[path[pathSize - 1]], cities[i]);
-        }
+        #ifdef _OPENMP
+            #pragma omp parallel for
+            for (i = 0; i < numCities; i++) {
+                if (std::find(path, (int*)(path + pathSize), i) == (int*)(path + pathSize))
+                    distances[j++] = distance(cities[path[pathSize - 1]], cities[i]);
+            }
+        #else
+            for (i = 0; i < numCities; i++) {
+                if (std::find(path, (int*)(path + pathSize), i) == (int*)(path + pathSize))
+                    distances[j++] = distance(cities[path[pathSize - 1]], cities[i]);
+            }       
+        #endif
+        
         DistanceData minDistanceData = getMinDistanceData(distances, j);
         totalDistance += minDistanceData.distance;
         path[pathSize++] = minDistanceData.dstId;

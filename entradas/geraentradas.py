@@ -1,6 +1,6 @@
 import random
 n = input()
-size = 2
+size = 100000
 for i in range(int(n)): 
     f = open("in-{}.txt".format(i), "w")
     f.write(str(size) + "\n")
