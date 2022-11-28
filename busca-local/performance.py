@@ -69,6 +69,8 @@ def runTests(binaries):
             legend = "C++"
         elif binary == "omptsp":
             legend = "C++ (OMP)"
+        elif binary == "cudatsp":
+            legend = "Cuda (GPU)"
         plt.plot(n, testTimes, label = legend)
         preparePerformancePlot(n)
     plt.savefig("final_performance.png")
@@ -86,11 +88,13 @@ if __name__ == "__main__":
     compileCode("g++", [f"-o {ompBinary}", "-O3", "-fopenmp", cppFile])
     print("Cpp openmp binary successfully compiled!\n")
 
-#    print("Compiling cuda implementation...")
-#    cudaFile = "TSPBuscaLocal.cu"
-#    cudaBinary = "cudatsp"
-#    compileCode("nvcc", [f"-o {cudaBinary}", cudaFile])
-#    print("Cuda binary successfully compiled!\n")
+    print("Compiling cuda implementation...")
+    cudaFile = "TSPBuscaLocal.cu"
+    cudaBinary = "cudatsp"
+    compileCode("nvcc", [f"-o {cudaBinary}", "-use_fast_math", cudaFile])
+    print("Cuda binary successfully compiled!\n")
 
-    binaries = [cppBinary, ompBinary]
+    binaries = [cudaBinary, cppBinary, ompBinary]
     runTests(binaries)
+
+    print("Done performance testing!")
