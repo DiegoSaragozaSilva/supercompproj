@@ -1,73 +1,103 @@
 #include <cmath>
 #include <iostream>
-
-#include <thrust/host_vector.h>
-#include <thrust/device_vector.h>
-#include <thrust/random.h>
-#include <thrust/shuffle.h>
-#include <thrust/transform.h>
-#include <thrust/functional.h>
+#include <limits>
+#include <vector>
+#include <algorithm>
+#include <random>
 
 struct City {
-    int id;
-    float x, y;
+	int index;
+	double x;
+	double y;
 
-    __host__ __device__ float operator()(const City& a, const City& b) const {
-        return sqrtf((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
-    }
+	__host__ __device__ double operator()(const City &c1, const City &c2) const {
+		double dx = c1.x - c2.x;
+		double dy = c1.y - c2.y;
+		return sqrt(dx * dx + dy * dy);
+	}
 };
 
-float getPathDistance(thrust::device_vector<City> devicePath) {
-    thrust::device_vector<City> devicePathShifted(devicePath.size());
-    thrust::copy(devicePath.begin() + 1, devicePath.end(), devicePathShifted.begin());
-    devicePathShifted[devicePathShifted.size() - 1] = devicePath[0];
+__device__ double get_path_distance(City c1, City c2) {
+    double dx = c1.x - c2.x;
+    double dy = c1.y - c2.y;
+    return sqrt(dx * dx + dy * dy);
+}
 
-    thrust::device_vector<float> deviceDistances(devicePath.size());
-    thrust::transform(devicePath.begin(), devicePath.end(), devicePathShifted.begin(), deviceDistances.begin(), City());
-    float sumDistances = thrust::reduce(deviceDistances.begin(), deviceDistances.end(), 0.0f, thrust::plus<float>());
-    return sumDistances;    
+__global__ void tsp(City* path, int n, double* distance) {
+    for (int j = 0; j < n - 1; j++) {
+        City aux = path[j];
+        path[j] = path[j + 1];
+        path[j + 1] = aux;
+
+        City* shifted_path = (City*)malloc(n * sizeof(City));
+        for (int i = 0; i < n; i++) shifted_path[i] = path[i];
+        shifted_path[n - 1] = path[0];
+
+        double path_distance;
+        for (int i = 0; i < n - 1; i++)
+            path_distance += get_path_distance(shifted_path[i], shifted_path[i + 1]);
+        path_distance += get_path_distance(shifted_path[0], shifted_path[n - 1]);
+
+        if (path_distance < *distance) *distance = path_distance;
+        else {
+            City aux = path[j];
+            path[j] = path[j + 1];
+            path[j + 1] = aux;
+        }
+        
+        free(shifted_path);
+    }
 }
 
 int main() {
-    uint32_t numCities = 0;
-    std::cin >> numCities;
+	int N;
+	std::cin >> N;
+	std::vector<City> cities (N);
+	for (int i = 0; i < N; ++i) {
+		double x, y;
+		std::cin >> x;
+		std::cin >> y;
 
-    thrust::host_vector<City> cities(numCities);
-    for (uint32_t i = 0; i < numCities; i++) {
-        cities[i].id = i;
-        std::cin >> cities[i].x;
-        std::cin >> cities[i].y;
-    } 
+		City c = {i, x, y};
+		cities[i] = c;
+	}
 
-    uint32_t seed = 10;
-    thrust::default_random_engine rndEngine(seed);
+	int seed = 42;
+	std::default_random_engine rndEngine(seed);
 
-    thrust::device_vector<City> deviceCities(cities);
-    thrust::device_vector<City> deviceBestPath(cities);
-    float bestDistance = getPathDistance(deviceBestPath);
-
-    uint32_t totalSearches = numCities * 10;
-    for (uint32_t i = 0; i < totalSearches; i++) {
-        thrust::device_vector<City> deviceCurrentPath(deviceBestPath);
-        thrust::shuffle(deviceCurrentPath.begin(), deviceCurrentPath.end(), rndEngine);
-        float currentDistance = getPathDistance(deviceCurrentPath);
-
-        for (uint32_t j = 0; j < numCities - 1; j++) {
-            thrust::swap(deviceCurrentPath[j], deviceCurrentPath[j + 1]);
-            float newDistance = getPathDistance(deviceCurrentPath);
-            if (newDistance < currentDistance) currentDistance = newDistance;
-        }
-
-        if (currentDistance < bestDistance) {
-            deviceBestPath = deviceCurrentPath;
-            bestDistance = currentDistance;
-        }
+	std::vector<std::vector<City>> tours (10 * N);
+	for (int i = 0; i < 10 * N; ++i) {
+		std::shuffle(cities.begin(), cities.end(), rndEngine);
+		tours[i] = cities;
     }
 
-    cities = deviceBestPath;
+    std::vector<City*> gpuPaths (10 * N);
+    for (int i = 0; i < 10 * N; i++) {
+        cudaMalloc((void**)&gpuPaths[i], sizeof(City) * N);
+        cudaMemcpy(gpuPaths[i], tours[i].data(), sizeof(City) * N, cudaMemcpyHostToDevice);
+    }
 
-    std::cout << bestDistance << " 0" << std::endl;
-    for (const auto city : cities)
-        std::cout << city.id << " ";
-    std::cout << std::endl;
+    std::vector<double*> gpuDistances (10 * N);
+    std::vector<cudaStream_t> streams (10 * N);
+    for (int i = 0; i < 10 * N; i++) {
+        double maxDouble = std::numeric_limits<double>::max();
+        cudaMalloc((void**)&gpuDistances[i], sizeof(double));
+        cudaMemcpy(gpuDistances[i], &maxDouble, sizeof(double), cudaMemcpyHostToDevice);
+
+        cudaStreamCreate(&streams[i]);
+        tsp <<<1, 1, 0, streams[i]>>> (gpuPaths[i], N, gpuDistances[i]);
+    }
+    cudaDeviceSynchronize();
+
+    for (int i = 0; i < 10 * N; i++) cudaFree(gpuPaths[i]);
+
+    double best_distance = std::numeric_limits<double>::max();
+    for (int i = 0; i < 10 * N; i++) {
+        double current_distance = 0.0;
+        cudaMemcpy(&current_distance, gpuDistances[i], sizeof(double), cudaMemcpyDeviceToHost);
+        cudaFree(gpuDistances[i]);
+        if (current_distance < best_distance) best_distance = current_distance;
+    }
+
+    std::cout << best_distance << std::endl;
 }
