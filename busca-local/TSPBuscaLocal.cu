@@ -65,17 +65,20 @@ int main() {
 	int seed = 42;
 	std::default_random_engine rndEngine(seed);
 
+	// std::cout << "A" << std::endl;
 	std::vector<std::vector<City>> tours (10 * N);
 	for (int i = 0; i < 10 * N; ++i) {
 		std::shuffle(cities.begin(), cities.end(), rndEngine);
 		tours[i] = cities;
     }
 
+	// std::cout << "B" << std::endl;
     std::vector<City*> gpuPaths (10 * N);
     for (int i = 0; i < 10 * N; i++) {
         cudaMalloc((void**)&gpuPaths[i], sizeof(City) * N);
         cudaMemcpy(gpuPaths[i], tours[i].data(), sizeof(City) * N, cudaMemcpyHostToDevice);
-    }
+    } 
+	// std::cout << "C" << std::endl;
 
     std::vector<double*> gpuDistances (10 * N);
     std::vector<cudaStream_t> streams (10 * N);
@@ -89,8 +92,10 @@ int main() {
     }
     cudaDeviceSynchronize();
 
+	// std::cout << "D" << std::endl;
     for (int i = 0; i < 10 * N; i++) cudaFree(gpuPaths[i]);
 
+	// std::cout << "E" << std::endl;
     double best_distance = std::numeric_limits<double>::max();
     for (int i = 0; i < 10 * N; i++) {
         double current_distance = 0.0;
@@ -99,5 +104,6 @@ int main() {
         if (current_distance < best_distance) best_distance = current_distance;
     }
 
-    std::cout << best_distance << std::endl;
+	// std::cout << "F" << std::endl;
+    // std::cout << best_distance << std::endl;
 }

@@ -123,18 +123,18 @@ int main() {
             outputData[i].bestDistance = bestDistance;
         }
 
-        for (OutputData data : outputData) {
-            std::cerr << "local: " << data.bestDistance << " ";
-            for (const auto city : data.bestPath)
-                std::cerr << city.id << " ";
-            std::cerr << std::endl;
-        }
+    //    for (OutputData data : outputData) {
+    //        std::cerr << "local: " << data.bestDistance << " ";
+    //        for (const auto city : data.bestPath)
+    //            std::cerr << city.id << " ";
+    //        std::cerr << std::endl;
+    //    }
     #endif
 
-    std::cout << bestDistance << " 0" << "\n";
-    for (City city : bestPath)
-        std::cout << city.id << " ";
-    std::cout << std::endl;
+    //std::cout << bestDistance << " 0" << "\n";
+    //for (City city : bestPath)
+    //    std::cout << city.id << " ";
+    //std::cout << std::endl;
 
     return 1;
 }

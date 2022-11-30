@@ -4,31 +4,23 @@ import subprocess
 import numpy as np
 from matplotlib import pyplot as plt
 
-def runCommand(command, _stdin = None):
-    process = subprocess.Popen(command.split(), stdin = subprocess.PIPE, stdout = subprocess.PIPE)
+def runCommand(command, _stdin = ""):
     startTime = time.time() * 1000.0
-
-    output = None
-    if _stdin == None:
-        output = process.communicate(input = b"")
-    else:
-        output = process.communicate(input = bytes(_stdin, "utf-8"))
-    process.wait()
+    process = subprocess.run(command.split(), input = _stdin.encode('utf-8'))
     endTime = time.time() * 1000.0
 
-    return [output, endTime - startTime]
+    return [0, endTime - startTime]
 
 def compileCode(compiler, args):
     command = compiler
     for arg in args:
         command += " " + arg
     print(f"Running {command}...")
-    output = runCommand(command)
+    runCommand(command)
 
-    print(f"Command output: {str(output[0][0])}")
-    if (output[0][1] != None):
-        print(f"Command error: {output[0][1]}")
-        raise Exception("Command outputed error during execution")
+    # print(f"Command output: {0)}")
+    # if (output[0][1] != None):
+    #     raise Exception("Command outputed error during execution")
 
 def getFileData(file):
     fileData = ""
@@ -73,7 +65,7 @@ def runTests(binaries):
             legend = "Cuda (GPU)"
         plt.plot(n, testTimes, label = legend)
         preparePerformancePlot(n)
-    plt.savefig("final_performance.png")
+    plt.savefig("final_performance_long.png")
 
 if __name__ == "__main__":
     # Compile both cpp, openmp and cuda files
@@ -91,7 +83,7 @@ if __name__ == "__main__":
     print("Compiling cuda implementation...")
     cudaFile = "TSPBuscaLocal.cu"
     cudaBinary = "cudatsp"
-    compileCode("nvcc", [f"-o {cudaBinary}", "-use_fast_math", cudaFile])
+    compileCode("nvcc", [f"-o {cudaBinary}", "-arch=sm_70", "-std=c++14", cudaFile])
     print("Cuda binary successfully compiled!\n")
 
     binaries = [cudaBinary, cppBinary, ompBinary]
